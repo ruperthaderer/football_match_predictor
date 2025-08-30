@@ -92,16 +92,19 @@ X_test_num  = impute_group_median(X_test_num,  num_cols_2)
 
 # === 5) HistGradientBoosting mit Early Stopping ===
 hgb = HistGradientBoostingClassifier(
-    learning_rate=0.06,
-    max_depth=6,
-    max_leaf_nodes=31,
+    learning_rate=0.1,
+    max_depth=4,
+    max_leaf_nodes=62,
     l2_regularization=0.0,
-    min_samples_leaf=30,
+    min_samples_leaf=20,
     early_stopping=True,
     validation_fraction=0.15,
     random_state=42
 )
-hgb.fit(X_train_num, y_train)
+
+sample_w = y_train.map({"H": 1.0, "D": 1.1, "A": 1.0}).values
+
+hgb.fit(X_train_num, y_train, sample_weight=sample_w)
 
 # Val
 proba_val = hgb.predict_proba(X_val_num)
@@ -112,13 +115,13 @@ print("LogLoss :", log_loss(y_val, proba_val))
 print(classification_report(y_val, pred_val))
 
 # === 6) Kalibrierung auf Val (hold-out kalibrieren, dann auf Test anwenden) ===
-cal = CalibratedClassifierCV(hgb, method="isotonic", cv="prefit")
+cal = CalibratedClassifierCV(hgb, method="sigmoid", cv="prefit")
 cal.fit(X_val_num, y_val)
 
 proba_test_cal = cal.predict_proba(X_test_num)
 pred_test_cal  = cal.predict(X_test_num)
 
-print("\n=== HGB + Isotonic (Test) ===")
+print("\n=== HGB + Sigmoid (Test) ===")
 print("Accuracy:", accuracy_score(y_test, pred_test_cal))
 print("LogLoss :", log_loss(y_test, proba_test_cal))
 

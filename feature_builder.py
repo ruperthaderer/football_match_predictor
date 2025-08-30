@@ -1,4 +1,3 @@
-# feature_builder.py
 from pathlib import Path
 import duckdb
 
@@ -10,9 +9,9 @@ PROCESSED.mkdir(parents=True, exist_ok=True)
 
 # Eingangsdatei auswählen (bevorzugt "dicke" Variante)
 candidates = [
-    INTERIM / "matches_core.csv",   # falls du dir eine aufgeräumte, aber "dicke" Variante abgelegt hast
-    INTERIM / "matches_big5.csv",   # Big-5-Filter, volle Spalten
-    INTERIM / "matches_slim.csv",   # Notfallback (enthält evtl. weniger Stats)
+    INTERIM / "matches_core.csv",
+    INTERIM / "matches_big5.csv",
+    INTERIM / "matches_slim.csv",
 ]
 inp = next((p for p in candidates if p.exists()), None)
 if not inp:
@@ -50,6 +49,8 @@ S += [
     "COALESCE(MatchTime,'') AS MatchTime",
     "HomeTeam",
     "AwayTeam",
+    # für konsistente Sortierung im Training:
+    "try_cast(MatchDate AS DATE) AS match_date",
     "concat_ws('|', Division, MatchDate, HomeTeam, AwayTeam) AS cfmd_match_id",
 ]
 
@@ -116,14 +117,12 @@ if has("OddHome","OddDraw","OddAway"):
         "try_cast(OddHome AS DOUBLE) AS OddHome",
         "try_cast(OddDraw AS DOUBLE) AS OddDraw",
         "try_cast(OddAway AS DOUBLE) AS OddAway",
-        # rohe inverse Quoten
+        # inverse Quoten (implizite *nicht* normalisierte Wahrscheinlichkeiten)
         "(1.0 / NULLIF(try_cast(OddHome AS DOUBLE),0)) AS qh",
         "(1.0 / NULLIF(try_cast(OddDraw AS DOUBLE),0)) AS qd",
         "(1.0 / NULLIF(try_cast(OddAway AS DOUBLE),0)) AS qa",
         # Summe (Overround)
-        "( (1.0 / NULLIF(try_cast(OddHome AS DOUBLE),0))"
-        " + (1.0 / NULLIF(try_cast(OddDraw AS DOUBLE),0))"
-        " + (1.0 / NULLIF(try_cast(OddAway AS DOUBLE),0)) ) AS qsum",
+        "(qh + qd + qa) AS qsum",
         # normalisierte implizite Wahrscheinlichkeiten
         "(qh / NULLIF(qsum,0)) AS p_home",
         "(qd / NULLIF(qsum,0)) AS p_draw",
@@ -156,8 +155,8 @@ if has("HomeTarget","AwayTarget"):
         S += [
             "(try_cast(HomeTarget AS DOUBLE) / NULLIF(try_cast(HomeShots AS DOUBLE),0)) AS shot_acc_home",
             "(try_cast(AwayTarget AS DOUBLE) / NULLIF(try_cast(AwayShots AS DOUBLE),0)) AS shot_acc_away",
-            "( (try_cast(HomeTarget AS DOUBLE) / NULLIF(try_cast(HomeShots AS DOUBLE),0))"
-            " - (try_cast(AwayTarget AS DOUBLE) / NULLIF(try_cast(AwayShots AS DOUBLE),0)) ) AS shot_acc_diff",
+            "((try_cast(HomeTarget AS DOUBLE) / NULLIF(try_cast(HomeShots AS DOUBLE),0))"
+            " - (try_cast(AwayTarget AS DOUBLE) / NULLIF(try_cast(AwayShots AS DOUBLE),0))) AS shot_acc_diff",
         ]
 
 # Fouls (optional)
@@ -189,14 +188,13 @@ if has("HomeCorners","AwayCorners"):
         "try_cast(AwayCorners AS DOUBLE) AS AwayCorners",
         "(try_cast(HomeCorners AS DOUBLE) - try_cast(AwayCorners AS DOUBLE)) AS corners_diff",
     ]
-    # kleiner Dominanz-Index, wenn auch Schüsse da sind
     if has("HomeShots","AwayShots"):
         S += [
             "((try_cast(HomeCorners AS DOUBLE) - try_cast(AwayCorners AS DOUBLE))"
             " + (try_cast(HomeShots AS DOUBLE) - try_cast(AwayShots AS DOUBLE))) / 2.0 AS dominance_index"
         ]
 
-# Form-Momentum (ein kleines Beispiel)
+# Form-Momentum
 if has("Form5Home","Form3Home"):
     S += ["(try_cast(Form5Home AS DOUBLE) - try_cast(Form3Home AS DOUBLE)) AS form_momentum_home"]
 if has("Form5Away","Form3Away"):
