@@ -27,7 +27,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 # --------------------------------------------
 BASE = "https://fbref.com"
 
-# Liga-Slugs und comp_id (aus deiner Struktur)
+# Liga-Slugs und comp_id
 LEAGUES = {
     "Premier-League": 9,
     "La-Liga": 12,

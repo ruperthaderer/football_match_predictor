@@ -1,4 +1,4 @@
-# lagged_features.py (ohne Streaks)
+# 11) lagged_features.py (ohne Streaks)
 # Rolling Features + Momentum (pre-match) für alle Teams
 # Output: data/processed/features_lagged.csv
 
@@ -11,7 +11,7 @@ OUT = DATA_PROCESSED / "features_lagged.csv"
 
 con = duckdb.connect()
 
-# 0) Basis laden
+# Basis laden
 con.execute(f"""
 CREATE OR REPLACE TABLE base AS
 SELECT * FROM read_csv_auto('{BASE_FEATS.as_posix()}', header=true, all_varchar=true);
@@ -33,7 +33,7 @@ SELECT
 FROM base;
 """)
 
-# 1) Team-Ansicht (jede Partie pro Team genau 1x)
+# Team-Ansicht (jede Partie pro Team genau 1x)
 con.execute("""
 CREATE OR REPLACE VIEW team_matches AS
 SELECT
@@ -64,7 +64,7 @@ FROM base_cast;
 # Einheitliche Sortierklausel für Windows
 ORDER_BY = "PARTITION BY team ORDER BY match_date, match_time_sort, Division, opponent"
 
-# 2) Lag-Basis: elo_change & rest_days
+# Lag-Basis: elo_change & rest_days
 con.execute(f"""
 CREATE OR REPLACE VIEW tm_lagbase AS
 SELECT
@@ -74,7 +74,7 @@ SELECT
 FROM team_matches tm;
 """)
 
-# 3) Rolling-Fenster (nur vorherige Spiele)
+# Rolling-Fenster (nur vorherige Spiele)
 con.execute(f"""
 CREATE OR REPLACE VIEW team_rolling AS
 SELECT
@@ -102,7 +102,7 @@ WINDOW
   w6 AS ({ORDER_BY} ROWS BETWEEN 6 PRECEDING AND 4 PRECEDING);
 """)
 
-# 4) Join zurück auf Match-Zeilen (Home/Away) – ohne Streak-Spalten
+# Join zurück auf Match-Zeilen (Home/Away) – ohne Streak-Spalten
 con.execute("""
 CREATE OR REPLACE VIEW lagged_per_match AS
 SELECT
@@ -137,6 +137,6 @@ LEFT JOIN team_rolling sh ON sh.team = b.HomeTeam AND sh.match_date = b.match_da
 LEFT JOIN team_rolling sa ON sa.team = b.AwayTeam AND sa.match_date = b.match_date AND sa.match_time_sort = b.match_time_sort;
 """)
 
-# 5) Export
+# Export
 con.execute(f"COPY lagged_per_match TO '{OUT.as_posix()}' (HEADER, DELIMITER ',');")
-print(f"✅ Geschrieben: {OUT}")
+print(f"Geschrieben: {OUT}")

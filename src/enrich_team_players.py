@@ -1,4 +1,4 @@
-# enrich_team_players.py
+# 3. enrich_team_players.py
 import re
 import duckdb
 from pathlib import Path
@@ -13,7 +13,7 @@ out_file    = DATA / "team_players_agg_enriched.csv"
 
 con = duckdb.connect()
 
-# 1) Spieler-Rohdaten laden (nur Felder, die wir brauchen)
+# load raw player data
 con.execute(f"""
 CREATE OR REPLACE VIEW players_raw AS
 SELECT match_url, match_title
@@ -23,7 +23,7 @@ SELECT match_url, match_title
 FROM read_csv_auto('{players_neu.as_posix()}', header=true, all_varchar=true);
 """)
 
-# 2) Auf EINE Zeile pro match_url reduzieren (sonst Join-Duplikate)
+# one col per match_url
 con.execute("""
 CREATE OR REPLACE VIEW match_titles AS
 SELECT
@@ -33,13 +33,13 @@ FROM players_raw
 GROUP BY match_url;
 """)
 
-# 3) Team-Aggregate laden (eine Zeile pro Team & Match)
+# load team aggregates
 con.execute(f"""
 CREATE OR REPLACE VIEW team_agg AS
 SELECT * FROM read_csv_auto('{team_agg.as_posix()}', header=true, all_varchar=true);
 """)
 
-# 4) Join (jetzt 1:1 per match_url)
+# join
 con.execute("""
 CREATE OR REPLACE VIEW team_agg_enriched_raw AS
 SELECT t.*, m.match_title
@@ -47,7 +47,7 @@ FROM team_agg t
 LEFT JOIN match_titles m USING(match_url);
 """)
 
-# 5) Parser-Funktionen registrieren (Rückgabetyp explizit!)
+# parse functions to extract team names
 con.create_function(
     "parse_home",
     lambda s: re.split(r" vs\. | vs |–", s)[0] if s else None,
@@ -68,7 +68,6 @@ con.create_function(
     return_type=str
 )
 
-# 6) Home/Away/Date parsen
 con.execute("""
 CREATE OR REPLACE VIEW team_agg_enriched AS
 SELECT
@@ -79,7 +78,7 @@ SELECT
 FROM team_agg_enriched_raw;
 """)
 
-# 7) (Optional) Duplikat-Check – sollte 0 sein
+# (optional) check for duplicates
 dups = con.execute("""
 SELECT match_url, team_hint, COUNT(*) AS cnt
 FROM team_agg_enriched
@@ -90,11 +89,11 @@ LIMIT 5;
 """).df()
 
 if len(dups) > 0:
-    print("⚠️ Unerwartete Duplikate nach dem Join:\n", dups)
+    print("Unerwartete Duplikate nach dem Join:\n", dups)
 
-# 8) Schreiben
+# write to file
 con.execute(f"""
 COPY team_agg_enriched TO '{out_file.as_posix()}' (HEADER, DELIMITER ',');
 """)
 
-print(f"✅ Enriched file geschrieben (ohne Duplikate): {out_file}")
+print(f"Enriched file geschrieben (ohne Duplikate): {out_file}")

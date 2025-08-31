@@ -1,4 +1,4 @@
-# filter_matches_big5.py
+# 4. filter_matches_big5.py
 import duckdb
 from pathlib import Path
 
@@ -14,7 +14,7 @@ out_csv = INTERIM / "matches_big5.csv"
 
 con = duckdb.connect()
 
-# Alle Zeilen mit den 5 Div-Codes durchlassen
+# only select games from the top 5 divisions
 con.execute(f"""
 COPY (
     SELECT *
@@ -23,4 +23,4 @@ COPY (
 ) TO '{out_csv.as_posix()}' WITH (HEADER, DELIMITER ',');
 """)
 
-print(f"✅ Gefilterte Datei erstellt: {out_csv}")
+print(f"Gefilterte Datei erstellt: {out_csv}")

@@ -1,3 +1,4 @@
+# 14) train_optuna.py
 import argparse, json
 from pathlib import Path
 import numpy as np
@@ -244,10 +245,10 @@ dump(cal, meta_dir / "model_calibrated.joblib")
 with open(meta_dir / "feature_schema.json", "w", encoding="utf-8") as f:
     json.dump(feature_schema, f, indent=2)
 
-print(f"💾 Modell: {meta_dir/'model_calibrated.joblib'}")
-print(f"💾 Schema: {meta_dir/'feature_schema.json'}")
+print(f"Modell: {meta_dir/'model_calibrated.joblib'}")
+print(f"Schema: {meta_dir/'feature_schema.json'}")
 
 out_dir = Path("models"); out_dir.mkdir(parents=True, exist_ok=True)
 with open(out_dir / "best_params.json", "w", encoding="utf-8") as f:
     json.dump(best_params, f, indent=2)
-print(f"\n✅ Gespeichert: {out_dir/'best_params.json'}")
+print(f"\nGespeichert: {out_dir/'best_params.json'}")

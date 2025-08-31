@@ -1,4 +1,4 @@
-# inspect_teams.py
+# 5) inspect_teams.py
 import duckdb
 from pathlib import Path
 
@@ -7,13 +7,12 @@ DATA = BASE / "data"
 INTERIM = DATA / "interim"
 RAW = DATA / "raw"
 
-# Dateien (ggf. anpassen)
-players_enriched = INTERIM / "team_players_agg_enriched.csv"  # aus enrich_team_players.py
-matches_csv = INTERIM / "matches_big5.csv"                             # CFMD: enthält HomeTeam, AwayTeam
+players_enriched = INTERIM / "team_players_agg_enriched.csv"
+matches_csv = INTERIM / "matches_big5.csv"
 
 con = duckdb.connect()
 
-# 1) Quellen laden
+# load sources
 con.execute(f"""
 CREATE OR REPLACE VIEW fbref_enriched AS
 SELECT * FROM read_csv_auto('{players_enriched.as_posix()}', header=true, all_varchar=true);
@@ -23,7 +22,7 @@ CREATE OR REPLACE VIEW matches_raw AS
 SELECT * FROM read_csv_auto('{matches_csv.as_posix()}', header=true, all_varchar=true);
 """)
 
-# 2) Distinct Teamlisten
+# distinct lists of teams
 con.execute("""
 CREATE OR REPLACE VIEW cfdm_teams AS
 SELECT DISTINCT HomeTeam AS team_name FROM matches_raw
@@ -49,7 +48,7 @@ print(con.execute("SELECT team_name FROM fbref_teams ORDER BY 1 LIMIT 25;").df()
 print("\n== Beispiele (CFMD) ==")
 print(con.execute("SELECT team_name FROM cfdm_teams ORDER BY 1 LIMIT 25;").df())
 
-# 3) Normalisierung (ohne Akzentlogik – laut dir nicht nötig in CFMD)
+# normalize team names (was a mistake, quite a few teams where it could have matched automatically)
 NORMALIZE_SQL = """
 lower(
   regexp_replace(
@@ -77,7 +76,7 @@ SELECT DISTINCT
 FROM cfdm_teams;
 """)
 
-# 4) Auto-Mapping (exakte Norm-Übereinstimmung)
+# Auto-Mapping
 con.execute("""
 CREATE OR REPLACE VIEW team_auto_map AS
 SELECT f.team_name AS fbref_team,
@@ -100,13 +99,13 @@ SELECT 'auto_map', COUNT(*) FROM team_auto_map;
 print("\n== Auto matches (sample) ==")
 print(con.execute("SELECT * FROM team_auto_map LIMIT 30;").df())
 
-# 5) Exporte
+# exports
 out_auto = INTERIM / "team_name_map_auto.csv"
-out_review = INTERIM / "team_name_map_review.csv"
+out_review = INTERIM / "team_name_map_review.csv" # used to create team_name_map_manual by hand
 
 con.execute(f"COPY team_auto_map TO '{out_auto.as_posix()}' WITH (HEADER, DELIMITER ',');")
 
-# FBref-Teams ohne Auto-Match + Kandidatenliste (alle CFMD-Varianten zur Auswahl)
+# remaining teams without a match
 con.execute(f"""
 COPY (
   SELECT f.team_name AS fbref_team, f.norm,
@@ -119,4 +118,4 @@ COPY (
 ) TO '{out_review.as_posix()}' WITH (HEADER, DELIMITER ',');
 """)
 
-print(f"\n✅ Exportiert:\n  {out_auto}\n  {out_review}")
+print(f"\nExportiert:\n  {out_auto}\n  {out_review}")

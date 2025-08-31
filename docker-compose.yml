@@ -1,0 +1,36 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: fm_api
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - ./models:/app/models:ro
+      # optional hot-reload während Dev:
+      # - ./api.py:/app/api.py
+      # - ./predict.py:/app/predict.py
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: fm_ui
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - API_BASE_URL=http://api:8000
+    volumes:
+      - ./models:/app/models:ro
+      # optional hot-reload während Dev:
+      # - ./streamlit_app.py:/app/streamlit_app.py
+      # - ./predict.py:/app/predict.py

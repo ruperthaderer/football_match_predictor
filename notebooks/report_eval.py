@@ -14,7 +14,7 @@ def main():
 
     import os; os.makedirs(args.outdir, exist_ok=True)
 
-    model = load("models/model_calibrated.joblib")
+    model = load("../models/model_calibrated.joblib")
     cols = json.load(open("models/feature_columns.json","r",encoding="utf-8"))
     labels = json.load(open("models/label_order.json","r",encoding="utf-8"))
 
@@ -43,7 +43,7 @@ def main():
     plt.xlabel("Predicted prob")
     plt.ylabel("Observed freq")
     plt.savefig(f"{args.outdir}/calibration_{args.split}_H.png", dpi=160, bbox_inches="tight")
-    print(f"✅ Reports in {args.outdir}")
+    print(f"Reports in {args.outdir}")
 
 if __name__ == "__main__":
     main()

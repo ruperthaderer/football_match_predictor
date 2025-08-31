@@ -73,7 +73,7 @@ def main():
         out["bet_recommendation"] = np.where(out["best_edge"] >= args.edge_threshold, out["best_pick"], "")
 
     out.to_csv(args.out, index=False, encoding="utf-8")
-    print(f"✅ gespeichert: {args.out}")
+    print(f"gespeichert: {args.out}")
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,4 @@
-# build_match_map.py  (final: dedup + distinct-count + same-day priority, no PRAGMA)
+# 9) build_match_map.py  (final: dedup + distinct-count + same-day priority, no PRAGMA)
 import duckdb
 from pathlib import Path
 
@@ -14,7 +14,7 @@ out_review = INTERIM / "match_map_review.csv"
 
 con = duckdb.connect()
 
-# 1) Quellen laden + korrektes Datumsparsing
+# load sources + parse date
 con.execute(f"""
 CREATE OR REPLACE VIEW fbref_raw AS
 SELECT
@@ -32,7 +32,6 @@ SELECT fbref_team, cfdm_team
 FROM read_csv_auto('{teammap_final.as_posix()}', header=true, all_varchar=true);
 """)
 
-# Deine Spalten: Division, MatchDate, HomeTeam, AwayTeam, FTHome, FTAway
 con.execute(f"""
 CREATE OR REPLACE VIEW matches_raw AS
 SELECT
@@ -47,12 +46,13 @@ FROM read_csv_auto('{matches_big5.as_posix()}', header=true, all_varchar=true)
 WHERE Division IN ('E0','SP1','F1','D1','I1');
 """)
 
+# sanity checks
 print("Rows fbref_raw:", con.execute("SELECT COUNT(*) FROM fbref_raw;").fetchone()[0])
 print("Rows matches_raw:", con.execute("SELECT COUNT(*) FROM matches_raw;").fetchone()[0])
 print("Rows teammap:", con.execute("SELECT COUNT(*) FROM teammap;").fetchone()[0])
 print("FBref rows with non-null date:", con.execute("SELECT COUNT(*) FROM fbref_raw WHERE match_date_fb IS NOT NULL;").fetchone()[0])
 
-# 2) Namen mappen + Vergleichs-Normalisierung
+# map team names + normalizing
 con.execute("""
 CREATE OR REPLACE VIEW fbref_mapped AS
 SELECT
@@ -76,7 +76,7 @@ SELECT
 FROM matches_raw;
 """)
 
-# 3) Kandidaten: same day (Priority 1) und ±1 Tag (Priority 2)
+# candidates: same day (Priority 1) and ±1 day (Priority 2)
 con.execute("""
 CREATE OR REPLACE VIEW mmc_same_day AS
 SELECT
@@ -116,7 +116,7 @@ JOIN matches_norm m
  AND abs(date_diff('day', m.MatchDate, fb.match_date_fb)) <= 1;
 """)
 
-# Union + Dedupe auf (match_url, cfmd_match_id) -> beste (same-day vor ±1, dann kleinste days_diff)
+# Union + dedupe on (match_url, cfmd_match_id)
 con.execute("""
 CREATE OR REPLACE VIEW match_map_candidates AS
 SELECT * FROM mmc_same_day
@@ -156,7 +156,7 @@ GROUP BY match_url, cfmd_match_id;
 print("Candidates total (pre-dedup):", con.execute("SELECT COUNT(*) FROM match_map_candidates;").fetchone()[0])
 print("Candidates after dedup:", con.execute("SELECT COUNT(*) FROM mmc_dedup;").fetchone()[0])
 
-# 4) Final: nur Matches, die auf GENAU EIN distinct cfmd_match_id treffen
+# final: games with one distinct cfmd_match_id
 con.execute("""
 CREATE OR REPLACE VIEW match_map AS
 WITH cnt AS (
@@ -183,7 +183,7 @@ SELECT COUNT(*) FROM cnt WHERE k <> 1;
 print("Resolved (unique) matches:", resolved)
 print("Unresolved (0 or >1 candidates):", unresolved)
 
-# 5) Review-Datei nur falls nötig (mit DISTINCT-Liste, korrekt aggregiert)
+# review file gets created if there are games w/o a match
 if unresolved:
     review_df = con.execute("""
     WITH agg AS (
@@ -210,8 +210,8 @@ if unresolved:
     ORDER BY candidate_count DESC, best_priority ASC;
     """).df()
     review_df.to_csv(out_review, index=False)
-    print(f"📝 Review-Liste geschrieben: {out_review}")
+    print(f"Review-Liste geschrieben: {out_review}")
 
-# 6) Schreiben
+# write to file
 con.execute(f"COPY match_map TO '{out_map.as_posix()}' WITH (HEADER, DELIMITER ',');")
-print(f"✅ match_map.csv: {out_map}")
+print(f"match_map.csv: {out_map}")

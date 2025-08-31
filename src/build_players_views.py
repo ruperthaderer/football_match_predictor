@@ -1,5 +1,5 @@
-# build_players_views.py
-# Liest players_summary_alt/neu, harmonisiert Spalten und erzeugt Team-Aggregate je Match.
+# 2. build_players_views.py
+# harmonize players_summary_alt/neu, create an aggregated table (1 column / team / game instead of ~14)
 
 import duckdb
 import pathlib
@@ -17,7 +17,7 @@ DB_PATH = ROOT / "warehouse.duckdb"
 # DuckDB-Verbindung
 con = duckdb.connect(str(DB_PATH))
 
-# 1) Views registrieren (mit Header = true, die Split-Dateien haben Header)
+# register views
 con.execute(f"""
 CREATE OR REPLACE VIEW summary_alt AS
 SELECT *
@@ -34,7 +34,7 @@ FROM read_csv_auto('{CSV_NEU.as_posix()}',
                    sample_size=-1, all_varchar=true, ignore_errors=true, null_padding=true);
 """)
 
-# kurze Übersicht, hilft beim Anpassen der cNN-Indizes, falls nötig
+# quick summary, check how to match the c's down below
 print("== summary_alt (erste 3 Spaltennamen) ==")
 print(con.execute("PRAGMA table_info('summary_alt');").df().head(5))
 print("== summary_neu (erste 3 Spaltennamen) ==")
@@ -140,7 +140,7 @@ WHERE LOWER(table_type) = 'summary'
   AND COALESCE(LOWER(c01),'') NOT LIKE '%players%';
 """)
 
-# 4) Union (jetzt gleiche Spaltenzahl/-reihenfolge)
+# 4) same num of columns + same order -> Union
 con.execute("""
 CREATE OR REPLACE VIEW players_unified AS
 SELECT * FROM players_alt_harmonized
@@ -149,7 +149,7 @@ SELECT * FROM players_neu_harmonized;
 """)
 
 
-# 5) Team-Aggregate je Match (Summe + Per-90, Basis)
+# 5) team-aggregates per match (mainly for mapping later)
 con.execute("""
 CREATE OR REPLACE VIEW team_players_agg AS
 WITH base AS (
@@ -210,8 +210,8 @@ WITH (HEADER, DELIMITER ',');
 
 # Kurzer Erfolgshinweis
 rows = con.execute("SELECT COUNT(*) FROM team_players_agg;").fetchone()[0]
-print(f"✅ team_players_agg.csv geschrieben: {OUT_CSV}  (Zeilen: {rows:,})")
-print(f"ℹ️  DuckDB-DB mit Views liegt unter: {DB_PATH}")
+print(f"team_players_agg.csv geschrieben: {OUT_CSV}  (Zeilen: {rows:,})")
+print(f"DuckDB-DB mit Views liegt unter: {DB_PATH}")
 
 print(con.execute("""
     SELECT league, season, COUNT(*) AS rows

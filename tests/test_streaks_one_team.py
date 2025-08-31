@@ -4,9 +4,9 @@
 from pathlib import Path
 import duckdb
 
-TEAM = "Man United"  # <-- hier dein Teamname einsetzen
+TEAM = "Man United"
 
-DATA_PROCESSED = Path("data/processed")
+DATA_PROCESSED = Path("../data/processed")
 BASE_FEATS = DATA_PROCESSED / "features_base.csv"
 
 con = duckdb.connect()
@@ -131,5 +131,5 @@ LIMIT 20;
 """)
 
 df = con.fetch_df()
-print(f"\n🔎 Streak-Check für: {TEAM}")
+print(f"\nStreak-Check für: {TEAM}")
 print(df)

@@ -1,3 +1,5 @@
+# 10) feature_builder.py
+
 from pathlib import Path
 import duckdb
 
@@ -7,7 +9,7 @@ INTERIM = DATA / "interim"
 PROCESSED = DATA / "processed"
 PROCESSED.mkdir(parents=True, exist_ok=True)
 
-# Eingangsdatei auswählen (bevorzugt "dicke" Variante)
+# choose input file
 candidates = [
     INTERIM / "matches_core.csv",
     INTERIM / "matches_big5.csv",
@@ -15,15 +17,15 @@ candidates = [
 ]
 inp = next((p for p in candidates if p.exists()), None)
 if not inp:
-    raise SystemExit("❌ Keine Eingabedatei gefunden. Erwartet eine der Dateien: "
+    raise SystemExit("Keine Eingabedatei gefunden. Erwartet eine der Dateien: "
                      f"{', '.join([p.as_posix() for p in candidates])}")
 
 out_csv = PROCESSED / "features_base.csv"
-print(f"🔧 Eingabe: {inp}")
+print(f"Eingabe: {inp}")
 
 con = duckdb.connect()
 
-# Spalten der CSV ermitteln
+# csv columns
 cols_df = con.execute(f"""
 DESCRIBE SELECT * FROM read_csv_auto('{inp.as_posix()}', header=true, all_varchar=true);
 """).df()
@@ -31,15 +33,15 @@ cols = (cols_df["column_name"].tolist()
         if "column_name" in cols_df.columns else cols_df["name"].tolist())
 colset = set(cols)
 
-def has(*names): return all(n in colset for n in names)
+def has(*names): return all(n in colset for n in names) # helper function to check if a column exists
 
-# Pflichtfelder prüfen (für IDs & Label)
+# check required columns for id + label
 required_min = ["Division","MatchDate","HomeTeam","AwayTeam"]
 missing_req = [c for c in required_min if c not in colset]
 if missing_req:
-    raise SystemExit(f"❌ Pflichtspalten fehlen: {missing_req}")
+    raise SystemExit(f"Pflichtspalten fehlen: {missing_req}")
 
-# SELECT-Liste dynamisch aufbauen
+# SELECT-List
 S = []
 
 # Basis-IDs
@@ -202,7 +204,7 @@ if has("Form5Away","Form3Away"):
 
 select_sql = ",\n  ".join(S)
 
-# Features berechnen und schreiben
+# compute features
 con.execute(f"""
 CREATE OR REPLACE VIEW features_base AS
 SELECT
@@ -214,7 +216,7 @@ con.execute(f"""
 COPY features_base TO '{out_csv.as_posix()}' (HEADER, DELIMITER ',');
 """)
 
-# kurze Übersicht
+# overview
 summary = con.execute("""
 SELECT
   COUNT(*) AS rows,
@@ -222,5 +224,5 @@ SELECT
 FROM features_base;
 """).df()
 
-print(f"✅ Geschrieben: {out_csv}")
+print(f"Geschrieben: {out_csv}")
 print(summary)
